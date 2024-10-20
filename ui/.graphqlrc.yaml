@@ -1,0 +1,23 @@
+overwrite: true
+schema:
+  - ../api/graphql/type_defs/*.graphql
+documents: src/graphql/*.graphql
+
+generates:
+  src/graphql/index.ts:
+    plugins:
+      - "typescript"
+      - "typescript-operations"
+      - "typescript-react-apollo"
+    config:
+      declarationKind: "interface"
+      maybeValue: T | null
+      enumsAsTypes: true
+      scalars:
+        JSON: object
+        DateTime: string
+        Password: string
+        Time: string
+        Email: string
+        PhoneNumber: string
+        Color: string

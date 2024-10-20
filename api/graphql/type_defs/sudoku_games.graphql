@@ -1,0 +1,71 @@
+#####################################
+####        Sudoku Games         ####
+#####################################
+
+type SudokuGameSquare {
+  x: Int!
+  y: Int!
+  number: Int
+  isFixed: Boolean!
+  notes: [Int!]!
+}
+
+enum SudokuSudokuGameMoveType {
+  SET_NUMBER
+  REMOVE_NUMBER
+  ADD_NOTE
+  REMOVE_NOTE
+}
+
+type SudokuGameMove {
+  x: Int!
+  y: Int!
+  number: Int!
+  type: SudokuSudokuGameMoveType!
+  timestamp: DateTime!
+}
+
+type SudokuGame {
+  id: ID!
+  userId: String!
+  board: [[SudokuGameSquare!]!]!
+  moves: [SudokuGameMove!]!
+  finishedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  user: User!
+}
+
+type ListSudokuGamesResult {
+  items: [SudokuGame!]!
+  nextToken: String
+}
+
+input ListSudokuGamesInput {
+  limit: Int
+  nextToken: String
+}
+
+extend type Query {
+  getSudokuGame(id: ID!): SudokuGame!
+  listSudokuGames(input: ListSudokuGamesInput): ListSudokuGamesResult!
+}
+
+input CreateSudokuGameInput {
+  difficulty: Int!
+}
+
+input MakeSudokuGameMoveInput {
+  gameId: ID!
+  x: Int!
+  y: Int!
+  number: Int!
+  type: SudokuSudokuGameMoveType!
+}
+
+extend type Mutation {
+  createSudokuGame(input: CreateSudokuGameInput!): SudokuGame!
+  makeSudokuGameMove(input: MakeSudokuGameMoveInput!): SudokuGame!
+  deleteSudokuGame(id: ID!): Boolean!
+}

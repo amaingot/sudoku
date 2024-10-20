@@ -1,0 +1,54 @@
+#####################################
+####            Users            ####
+#####################################
+
+type User {
+  id: ID!
+  firstName: String!
+  lastName: String!
+  email: Email!
+  phoneNumber: PhoneNumber!
+  currentSudokuGameId: String
+  createdAt: String!
+  updatedAt: String!
+
+  currentSudokuGame: SudokuGame
+}
+
+input ListUsersInput {
+  limit: Int
+  nextToken: String
+}
+
+type ListUsersResult {
+  items: [User!]!
+  nextToken: String
+}
+
+extend type Query {
+  me: User!
+  getUser(id: ID!): User!
+  listUsers(input: ListUsersInput): ListUsersResult!
+}
+
+input CreateUserInput {
+  firstName: String!
+  lastName: String!
+  email: Email!
+  phoneNumber: PhoneNumber!
+  password: Password!
+}
+
+input UpdateUserInput {
+  id: ID!
+  firstName: String!
+  lastName: String!
+  phoneNumber: PhoneNumber!
+  password: Password
+}
+
+extend type Mutation {
+  createUser(input: CreateUserInput!): User!
+  updateUser(input: UpdateUserInput!): User!
+  deleteUser(id: ID!): Boolean!
+}

@@ -1,0 +1,52 @@
+fragment SudokuGame on SudokuGame {
+  id
+  userId
+  board {
+    x
+    y
+    number
+    isFixed
+    notes
+  }
+  moves {
+    x
+    y
+    number
+    type
+    timestamp
+  }
+  finishedAt
+  createdAt
+  updatedAt
+}
+
+query GetSudokuGame($id: ID!) {
+  getSudokuGame(id: $id) {
+    ...SudokuGame
+  }
+}
+
+query ListSudokuGames($input: ListSudokuGamesInput) {
+  listSudokuGames(input: $input) {
+    items {
+      ...SudokuGame
+    }
+    nextToken
+  }
+}
+
+mutation CreateSudokuGame($input: CreateSudokuGameInput!) {
+  createSudokuGame(input: $input) {
+    ...SudokuGame
+  }
+}
+
+mutation MakeSudokuGameMove($input: MakeSudokuGameMoveInput!) {
+  makeSudokuGameMove(input: $input) {
+    ...SudokuGame
+  }
+}
+
+mutation DeleteSudokuGame($id: ID!) {
+  deleteSudokuGame(id: $id)
+}

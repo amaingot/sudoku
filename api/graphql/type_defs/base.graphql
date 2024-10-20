@@ -1,0 +1,90 @@
+#####################################
+####    Base Query / Mutation    ####
+#####################################
+
+type Error {
+  message: String!
+  code: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+input PaginationInput {
+  page: Int
+  perPage: Int
+}
+
+enum SortOrder {
+  DESC
+  ASC
+}
+
+input SortInput {
+  field: String!
+  order: SortOrder!
+}
+
+input DateFilter {
+  gt: DateTime
+  gte: DateTime
+  lte: DateTime
+  lt: DateTime
+  equals: DateTime
+  isEmpty: Boolean
+  isNotEmpty: Boolean
+}
+
+input StringFilter {
+  contains: String
+  equals: String
+  startsWith: String
+  endsWith: String
+  isEmpty: Boolean
+  isNotEmpty: Boolean
+  isAnyOf: [String!]
+}
+
+input IntFilter {
+  equals: Int
+  gt: Int
+  gte: Int
+  lte: Int
+  lt: Int
+  isEmpty: Boolean
+  isNotEmpty: Boolean
+}
+
+input FloatFilter {
+  equals: Float
+  gt: Float
+  gte: Float
+  lte: Float
+  lt: Float
+  isEmpty: Boolean
+  isNotEmpty: Boolean
+}
+
+input BooleanFilter {
+  equals: Boolean
+  isEmpty: Boolean
+  isNotEmpty: Boolean
+}
+
+scalar DateTime
+scalar Password
+scalar Time
+scalar Email
+scalar PhoneNumber
+scalar JSON
+scalar Color
+
+type Query {
+  ping: Boolean
+}
+
+type Mutation {
+  pong: Boolean
+}

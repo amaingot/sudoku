@@ -1,0 +1,250 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - "main"
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  determine_environment:
+    name: 🧪 Determine Environment
+    runs-on: ubuntu-latest
+    outputs:
+      ENVIRONMENT: ${{ steps.determine_environment.outputs.result }}
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v4
+
+      - name: 🧪 Determine Environment
+        uses: actions/github-script@v7
+        id: determine_environment
+        with:
+          script: |
+            if ('${{ github.ref_type }}' === 'tag') {
+              return 'prod';
+            } else {
+              return 'beta';
+            }
+          result-encoding: string
+
+  build_lambda:
+    name: 🛠 Build Python Lambda
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🏗 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 🏗 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -t python
+
+      - name: 📦 Package Layer Zip
+        run: |
+          zip -r layer.zip python
+
+      - name: 📦 Package Lambda Zip
+        run: |
+          zip -r lambda.zip api
+
+      - name: 💾 Save Lambda assets to Github
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-assets
+          path: |
+            layer.zip
+            lambda.zip
+          retention-days: 1
+
+  build_ui:
+    name: 🛠 Build UI assets
+    runs-on: ubuntu-latest
+    needs:
+      - determine_environment
+    environment:
+      name: ${{ needs.determine_environment.outputs.ENVIRONMENT }}
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Yarn and Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache-dependency-path: ui/yarn.lock
+
+      - name: 🏗 Set Yarn version to Berry
+        working-directory: ui
+        run: yarn set version berry
+
+      - name: 📚 Install dependencies
+        working-directory: ui
+        run: |
+          yarn install --immutable
+
+      - name: 📚 Generate GraphQL hooks/types
+        working-directory: ui
+        run: |
+          yarn gql
+
+      - name: 🛠 Build UI Assets
+        working-directory: ui
+        env:
+          VITE_ENV: ${{ needs.determine_environment.outputs.ENVIRONMENT }}
+          VITE_SHA: ${{ github.sha }}
+          VITE_API_DOMAIN: ${{ vars.API_DOMAIN }}
+          VITE_WS_DOMAIN: ${{ vars.WS_DOMAIN }}
+          VITE_AUTH_DOMAIN: ${{ vars.AUTH_DOMAIN }}
+          VITE_AUTH_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
+        run: |
+          yarn --cwd=ui build
+
+      - name: 💾 Save UI assets to Github
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-assets
+          path: ui/dist/*
+          retention-days: 1
+
+  tf_apply:
+    name: 🏗️ Terraform Apply
+    runs-on: ubuntu-latest
+    needs:
+      - determine_environment
+    outputs:
+      lambda_layer_name: ${{ fromJson(steps.tf_output.outputs.stdout).lambda_layer_name.value }}
+      api_lambda_name: ${{ fromJson(steps.tf_output.outputs.stdout).api_lambda_name.value }}
+      ws_lambda_name: ${{ fromJson(steps.tf_output.outputs.stdout).ws_lambda_name.value }}
+      auth_lambda_name: ${{ fromJson(steps.tf_output.outputs.stdout).auth_lambda_name.value }}
+      ui_s3_bucket: ${{ fromJson(steps.tf_output.outputs.stdout).ui_s3_bucket.value }}
+      cloudfront_distribution_id: ${{ fromJson(steps.tf_output.outputs.stdout).cloudfront_distribution_id.value }}
+      deployment_url: ${{ fromJson(steps.tf_output.outputs.stdout).deployment_url.value }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.TERRAFORM_GITHUB_TOKEN }}
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🏗 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+          terraform_wrapper: true
+
+      - name: 🏗 Terraform Init
+        working-directory: infra
+        run: |
+          terraform init
+          terraform workspace select ${{ needs.determine_environment.outputs.ENVIRONMENT }}
+
+      - name: 🪄 Terraform Apply
+        working-directory: infra
+        run: |
+          terraform apply \
+            -var-file="vars/${{ needs.determine_environment.outputs.ENVIRONMENT }}.tfvars" \
+            -var="sha=${{ github.sha }}" \
+            -auto-approve
+
+      - name: 📝 Save Terraform Output
+        id: tf_output
+        working-directory: infra
+        run: |
+          terraform output -json
+
+  deployment:
+    name: 🚀 Deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.determine_environment.outputs.ENVIRONMENT }}
+      url: ${{ needs.tf_apply.outputs.deployment_url }}
+    needs:
+      - determine_environment
+      - build_ui
+      - build_lambda
+      - tf_apply
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v4
+
+      - name: ⬇️ Download UI assets from Github
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-assets
+          path: ui-assets
+
+      - name: ⬇️ Download Lambda assets from Github
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-assets
+          path: "."
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🚀 Deploy Lambda Layer
+        id: deploy-layer
+        run: |
+          LAYER_ARN=$(aws lambda publish-layer-version \
+            --layer-name ${{ needs.tf_apply.outputs.lambda_layer_name }} \
+            --description "Tennis Shop Guru Lambda Layer (Github SHA:${{ github.sha }}" \
+            --zip-file fileb://layer.zip \
+            --compatible-runtimes python3.12 \
+            --compatible-architectures x86_64 \
+            --region ${{ secrets.AWS_REGION }} \
+            --output json \
+            --no-cli-pager \
+            --query 'LayerVersionArn')
+
+          LAYER_ARN=$(echo $LAYER_ARN | tr -d '"')
+
+          chmod +x scripts/ci_deploy_lambda.sh
+          echo "LAYER_ARN=$LAYER_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: 🚀 Deploy Lambdas
+        env:
+          LAYER_VERSION_ARN: ${{ steps.deploy-layer.outputs.LAYER_ARN }}
+        run: |
+          ./scripts/ci_deploy_lambda.sh ${{ needs.tf_apply.outputs.api_lambda_name }} &
+          ./scripts/ci_deploy_lambda.sh ${{ needs.tf_apply.outputs.ws_lambda_name }} &
+          ./scripts/ci_deploy_lambda.sh ${{ needs.tf_apply.outputs.auth_lambda_name }} &
+          wait
+
+      - name: 🚀 Upload UI assets to S3
+        run: |
+          aws s3 sync ui-assets s3://${{ needs.tf_apply.outputs.ui_s3_bucket }} --delete
+
+      - name: 🧹 Invalidate Dev Cloudfront Caches
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ needs.tf_apply.outputs.cloudfront_distribution_id }} \
+            --paths '/*'

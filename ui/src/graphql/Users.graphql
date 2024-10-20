@@ -1,0 +1,46 @@
+fragment User on User {
+  id
+  firstName
+  lastName
+  email
+  phoneNumber
+  createdAt
+  updatedAt
+}
+
+query GetMe {
+  me {
+    ...User
+  }
+}
+
+query GetUser($id: ID!) {
+  getUser(id: $id) {
+    ...User
+  }
+}
+
+query ListUsers($input: ListUsersInput) {
+  listUsers(input: $input) {
+    items {
+      ...User
+    }
+    nextToken
+  }
+}
+
+mutation CreateUser($input: CreateUserInput!) {
+  createUser(input: $input) {
+    ...User
+  }
+}
+
+mutation UpdateUser($input: UpdateUserInput!) {
+  updateUser(input: $input) {
+    ...User
+  }
+}
+
+mutation DeleteUser($id: ID!) {
+  deleteUser(id: $id)
+}

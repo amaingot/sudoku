@@ -1,0 +1,21 @@
+#####################################
+####           Sign Up           ####
+#####################################
+
+input SignUpInput {
+  firstName: String!
+  lastName: String!
+  email: Email!
+  password: Password!
+  phoneNumber: PhoneNumber!
+}
+
+input ConfirmSignUpInput {
+  userId: ID!
+  code: String!
+}
+
+extend type Mutation {
+  signUp(input: SignUpInput!): User!
+  confirmSignUp(input: ConfirmSignUpInput!): Boolean!
+}
