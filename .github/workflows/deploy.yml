@@ -94,10 +94,6 @@ jobs:
           node-version-file: .nvmrc
           cache-dependency-path: ui/yarn.lock
 
-      - name: 🏗 Set Yarn version to Berry
-        working-directory: ui
-        run: yarn set version berry
-
       - name: 📚 Install dependencies
         working-directory: ui
         run: |
