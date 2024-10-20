@@ -16,27 +16,6 @@ permissions:
   contents: read
 
 jobs:
-  determine_environment:
-    name: 🧪 Determine Environment
-    runs-on: ubuntu-latest
-    outputs:
-      ENVIRONMENT: ${{ steps.determine_environment.outputs.result }}
-    steps:
-      - name: 🏗 Check out the repo
-        uses: actions/checkout@v4
-
-      - name: 🧪 Determine Environment
-        uses: actions/github-script@v7
-        id: determine_environment
-        with:
-          script: |
-            if ('${{ github.ref_type }}' === 'tag') {
-              return 'prod';
-            } else {
-              return 'beta';
-            }
-          result-encoding: string
-
   build_lambda:
     name: 🛠 Build Python Lambda
     runs-on: ubuntu-latest
@@ -77,13 +56,77 @@ jobs:
             lambda.zip
           retention-days: 1
 
-  build_ui:
-    name: 🛠 Build UI assets
+  tf_apply:
+    name: 🏗️ Terraform Apply
     runs-on: ubuntu-latest
-    needs:
-      - determine_environment
+    outputs:
+      environment: ${{ steps.determine_environment.outputs.result }}
+      lambda_layer_name: ${{ fromJson(steps.tf_output.outputs.stdout).lambda_layer_name.value }}
+      api_lambda_name: ${{ fromJson(steps.tf_output.outputs.stdout).api_lambda_name.value }}
+      ws_lambda_name: ${{ fromJson(steps.tf_output.outputs.stdout).ws_lambda_name.value }}
+      auth_lambda_name: ${{ fromJson(steps.tf_output.outputs.stdout).auth_lambda_name.value }}
+      ui_s3_bucket: ${{ fromJson(steps.tf_output.outputs.stdout).ui_s3_bucket.value }}
+      cloudfront_distribution_id: ${{ fromJson(steps.tf_output.outputs.stdout).cloudfront_distribution_id.value }}
+      deployment_url: ${{ fromJson(steps.tf_output.outputs.stdout).deployment_url.value }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.TERRAFORM_GITHUB_TOKEN }}
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v4
+
+      - name: 🧪 Determine Environment
+        uses: actions/github-script@v7
+        id: determine_environment
+        with:
+          script: |
+            if ('${{ github.ref_type }}' === 'tag') {
+              return 'prod';
+            } else {
+              return 'beta';
+            }
+          result-encoding: string
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🏗 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+          terraform_wrapper: true
+
+      - name: 🏗 Terraform Init
+        working-directory: terraform
+        run: |
+          terraform init
+          terraform workspace select ${{ steps.determine_environment.outputs.result }}
+
+      - name: 🪄 Terraform Apply
+        working-directory: terraform
+        run: |
+          terraform apply \
+            -var-file="vars/${{ steps.determine_environment.outputs.result }}.tfvars" \
+            -var="sha=${{ github.sha }}" \
+            -auto-approve
+
+      - name: 📝 Save Terraform Output
+        id: tf_output
+        working-directory: terraform
+        run: |
+          terraform output -json
+
+  deployment:
+    name: 🚀 Deploy
+    runs-on: ubuntu-latest
     environment:
-      name: ${{ needs.determine_environment.outputs.ENVIRONMENT }}
+      name: ${{ needs.tf_apply.outputs.environment }}
+      url: ${{ needs.tf_apply.outputs.deployment_url }}
+    needs:
+      - build_lambda
+      - tf_apply
     steps:
       - name: 🏗 Check out the repo
         uses: actions/checkout@v4
@@ -107,7 +150,7 @@ jobs:
       - name: 🛠 Build UI Assets
         working-directory: ui
         env:
-          VITE_ENV: ${{ needs.determine_environment.outputs.ENVIRONMENT }}
+          VITE_ENV: ${{ needs.tf_apply.outputs.environment }}
           VITE_SHA: ${{ github.sha }}
           VITE_API_DOMAIN: ${{ vars.API_DOMAIN }}
           VITE_WS_DOMAIN: ${{ vars.WS_DOMAIN }}
@@ -115,85 +158,6 @@ jobs:
           VITE_AUTH_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
         run: |
           yarn --cwd=ui build
-
-      - name: 💾 Save UI assets to Github
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-assets
-          path: ui/dist/*
-          retention-days: 1
-
-  tf_apply:
-    name: 🏗️ Terraform Apply
-    runs-on: ubuntu-latest
-    needs:
-      - determine_environment
-    outputs:
-      lambda_layer_name: ${{ fromJson(steps.tf_output.outputs.stdout).lambda_layer_name.value }}
-      api_lambda_name: ${{ fromJson(steps.tf_output.outputs.stdout).api_lambda_name.value }}
-      ws_lambda_name: ${{ fromJson(steps.tf_output.outputs.stdout).ws_lambda_name.value }}
-      auth_lambda_name: ${{ fromJson(steps.tf_output.outputs.stdout).auth_lambda_name.value }}
-      ui_s3_bucket: ${{ fromJson(steps.tf_output.outputs.stdout).ui_s3_bucket.value }}
-      cloudfront_distribution_id: ${{ fromJson(steps.tf_output.outputs.stdout).cloudfront_distribution_id.value }}
-      deployment_url: ${{ fromJson(steps.tf_output.outputs.stdout).deployment_url.value }}
-    env:
-      GITHUB_TOKEN: ${{ secrets.TERRAFORM_GITHUB_TOKEN }}
-    steps:
-      - name: 🏗 Check out the repo
-        uses: actions/checkout@v4
-
-      - name: 🔐 Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: 🏗 Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.7
-          terraform_wrapper: true
-
-      - name: 🏗 Terraform Init
-        working-directory: terraform
-        run: |
-          terraform init
-          terraform workspace select ${{ needs.determine_environment.outputs.ENVIRONMENT }}
-
-      - name: 🪄 Terraform Apply
-        working-directory: terraform
-        run: |
-          terraform apply \
-            -var-file="vars/${{ needs.determine_environment.outputs.ENVIRONMENT }}.tfvars" \
-            -var="sha=${{ github.sha }}" \
-            -auto-approve
-
-      - name: 📝 Save Terraform Output
-        id: tf_output
-        working-directory: terraform
-        run: |
-          terraform output -json
-
-  deployment:
-    name: 🚀 Deploy
-    runs-on: ubuntu-latest
-    environment:
-      name: ${{ needs.determine_environment.outputs.ENVIRONMENT }}
-      url: ${{ needs.tf_apply.outputs.deployment_url }}
-    needs:
-      - determine_environment
-      - build_ui
-      - build_lambda
-      - tf_apply
-    steps:
-      - name: 🏗 Check out the repo
-        uses: actions/checkout@v4
-
-      - name: ⬇️ Download UI assets from Github
-        uses: actions/download-artifact@v4
-        with:
-          name: ui-assets
-          path: ui-assets
 
       - name: ⬇️ Download Lambda assets from Github
         uses: actions/download-artifact@v4
@@ -237,7 +201,7 @@ jobs:
 
       - name: 🚀 Upload UI assets to S3
         run: |
-          aws s3 sync ui-assets s3://${{ needs.tf_apply.outputs.ui_s3_bucket }} --delete
+          aws s3 sync ui/dist s3://${{ needs.tf_apply.outputs.ui_s3_bucket }} --delete
 
       - name: 🧹 Invalidate Dev Cloudfront Caches
         run: |
