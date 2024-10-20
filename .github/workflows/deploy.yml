@@ -159,13 +159,13 @@ jobs:
           terraform_wrapper: true
 
       - name: 🏗 Terraform Init
-        working-directory: infra
+        working-directory: terraform
         run: |
           terraform init
           terraform workspace select ${{ needs.determine_environment.outputs.ENVIRONMENT }}
 
       - name: 🪄 Terraform Apply
-        working-directory: infra
+        working-directory: terraform
         run: |
           terraform apply \
             -var-file="vars/${{ needs.determine_environment.outputs.ENVIRONMENT }}.tfvars" \
@@ -174,7 +174,7 @@ jobs:
 
       - name: 📝 Save Terraform Output
         id: tf_output
-        working-directory: infra
+        working-directory: terraform
         run: |
           terraform output -json
 
