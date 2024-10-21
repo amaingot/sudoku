@@ -1,8 +1,8 @@
-from typing import Optional, TypedDict
+from typing import List, Optional, TypedDict
 from ariadne import convert_kwargs_to_snake_case
 
 from api.graphql.context import ResolverInfo
-from api.data import sudoku_games
+from api.data import sudoku_games, users
 from api.utils.logging import logger
 from api.utils import sudoku
 
@@ -11,6 +11,29 @@ from api.utils import sudoku
 def get_game_id(parent: sudoku_games.Game, info: ResolverInfo):
     logger.info("resolving game id")
     return parent['game_id']
+
+
+@convert_kwargs_to_snake_case
+def get_cell_is_correct(parent: sudoku_games.GameSquare, info: ResolverInfo):
+    logger.info("resolving cell is correct")
+    if parent['number'] is None or parent["is_fixed"]:
+        return None
+
+    return parent["answer"] == parent["number"]
+
+
+@convert_kwargs_to_snake_case
+def get_cell_notes(parent: sudoku_games.GameSquare, info: ResolverInfo):
+    logger.info("resolving cell notes")
+    if parent["number"] is not None:
+        return []
+
+    # Intersection of notes and current_possible_numbers
+    valid_notes: List[int] = []
+    for note in parent["notes"]:
+        if note in parent["current_possible_numbers"]:
+            valid_notes.append(note)
+    return valid_notes
 
 
 @convert_kwargs_to_snake_case
@@ -32,7 +55,7 @@ def get_game(parent, info: ResolverInfo, **kwargs):
         id = parent['current_sudoku_game_id']
 
     if not id:
-        raise Exception("Game id not provided")
+        return None
 
     game = sudoku_games.get(id)
 
@@ -51,11 +74,11 @@ class ListGamesInput(TypedDict):
 
 
 @convert_kwargs_to_snake_case
-def list_games(_, info: ResolverInfo, input: ListGamesInput):
+def list_games(_, info: ResolverInfo, input: Optional[ListGamesInput] = None):
     logger.info("listing games")
 
-    limit: int = input["limit"] or 25
-    next_token = input.get('next_token', None)
+    limit: int = input["limit"] or 25 if input else 25
+    next_token = input.get('next_token', None) if input else None
     user_id = info.context.user_id
     if not user_id:
         raise Exception("User not logged in")
@@ -81,7 +104,11 @@ def create_game(_, info: ResolverInfo, input: CreateGameInput):
     game = sudoku_games.create({
         **generated_game,
         "user_id": user['user_id'],
-        "difficulty": input['difficulty'],
+    })
+
+    users.update({
+        **user,
+        "current_sudoku_game_id": game['game_id']
     })
 
     return game
@@ -98,7 +125,7 @@ class MakeGameMoveInput(TypedDict):
 @convert_kwargs_to_snake_case
 def make_game_move(_, info: ResolverInfo, input: MakeGameMoveInput):
     logger.info("making game move, game id: %s", input['game_id'])
-    info.context.assert_admin()
+    info.context.assert_user()
 
     game = sudoku_games.get(input['game_id'])
 

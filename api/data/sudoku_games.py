@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional, TypedDict
+from typing import Optional, TypedDict, List
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
@@ -14,6 +14,7 @@ from api.utils.date_time import (
 )
 from api.utils.logging import logger
 from api.config import config
+from api.utils.sudoku import update_possible_notes
 
 dynamodb = boto3.resource('dynamodb')
 
@@ -22,8 +23,11 @@ class GameSquare(TypedDict):
     x: int
     y: int
     number: Optional[int]
+    is_correct: Optional[bool]
     is_fixed: bool
-    notes: list[int]
+    notes: List[int]
+    current_possible_numbers: List[int]
+    answer: int
 
 
 class GameMoveType(Enum):
@@ -45,8 +49,8 @@ class Game(TypedDict):
     game_id: str
     user_id: str
     difficulty: int
-    board: list[list[GameSquare]]
-    moves: list[GameMove]
+    board: List[List[GameSquare]]
+    moves: List[GameMove]
     finished_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
@@ -54,30 +58,43 @@ class Game(TypedDict):
 
 def deserialize(data) -> Game:
     raw_board = data.get('board', [])
-    board: list[list[GameSquare]] = []
+    board: List[List[GameSquare]] = []
 
-    for y, row in enumerate(raw_board):
-        if not isinstance(row, list):
+    for y in range(9):
+        board.append([None, None, None, None, None, None,
+                      None, None, None])  # type: ignore
+
+    for row in raw_board:
+        if not isinstance(row, List):
             continue
-        if len(board) <= y:
-            board.append([])
-        for x, raw_square in enumerate(row):
+        for raw_square in row:
+            x = int(raw_square.get('x', 0))
+            y = int(raw_square.get('y', 0))
             square: GameSquare = {
                 'x': x,
                 'y': y,
-                'number': raw_square.get('number', None),
+                'number': int(raw_square.get('number', None)) if raw_square.get('number', None) is not None else None,
+                'is_correct': raw_square.get('is_correct', None),
                 'is_fixed': raw_square.get('is_fixed', False),
-                'notes': raw_square.get('notes', []),
+                'notes': [int(num) for num in raw_square.get('notes', [])],
+                'answer': int(raw_square.get('answer', 0)),
+                'current_possible_numbers': [int(num) for num in raw_square.get(
+                    'current_possible_numbers', [])],
             }
-            board[y][x] = square
+            board[x][y] = square
+
+    for x, row in enumerate(board):
+        sorted_row = sorted(row, key=lambda square: square['y'])
+        board[x] = sorted_row
+    board = sorted(board, key=lambda row: row[0]['x'])
 
     raw_moves = data.get('moves', [])
-    moves: list[GameMove] = []
+    moves: List[GameMove] = []
     for raw_move in raw_moves:
         move: GameMove = {
-            'x': raw_move.get('x', 0),
-            'y': raw_move.get('y', 0),
-            'number': raw_move.get('number', 0),
+            'x': int(raw_move.get('x', 0)),
+            'y': int(raw_move.get('y', 0)),
+            'number': int(raw_move.get('number', 0)),
             'type': GameMoveType(raw_move.get('type', '')),
             'timestamp': parse_datetime(raw_move.get('timestamp', '')),
         }
@@ -116,7 +133,7 @@ def serialize(game: Game) -> dict:
 class GameParams(TypedDict):
     game_id: str
     user_id: str
-    board: list[list[GameSquare]]
+    board: List[List[GameSquare]]
     difficulty: int
 
 
@@ -136,7 +153,7 @@ def create(game_params: GameParams):
     except ClientError as e:
         logger.error(
             f"Failed to add game. Error: {e.response.get('Error', {}).get('Message', '')}")
-        return None
+        raise Exception("Failed to add game") from e
 
 
 def get(game_id: str) -> Optional[Game]:
@@ -175,20 +192,26 @@ def list_by_user_id(user_id: str, limit: int = 25, next_token: Optional[str] = N
     except ClientError as e:
         logger.error(
             f"Failed to get chats. Error: {e.response.get('Error', {}).get('Message', '')}")
-        return None
+        return {
+            'items': [],
+            'next_token': None
+        }
 
 
 def update(game: Game):
     """Update a game"""
     table = dynamodb.Table(config.sudoku_games_dynamodb_table)
-    try:
 
-        response = table.put_item(Item={
-            **serialize(game),
-            "created_at": serialize_datetime(game['created_at']),
-            "updated_at": get_now_str(),
-        })
-        return response
+    update_possible_notes(game["board"])
+
+    updated_game: dict = {
+        **serialize(game),
+        "created_at": serialize_datetime(game['created_at']),
+        "updated_at": get_now_str(),
+    }
+    try:
+        table.put_item(Item=updated_game)
+        return deserialize(updated_game)
     except ClientError as e:
         logger.error(
             f"Failed to add game. Error: {e.response.get('Error', {}).get('Message', '')}")
@@ -234,7 +257,7 @@ def add_note(params: PlayGameParams):
     if params['x'] < 0 or params['x'] > 8 or params['y'] < 0 or params['y'] > 8:
         raise Exception("Invalid square")
 
-    square = game['board'][params['y']][params['x']]
+    square = game['board'][params['x']][params['y']]
 
     if game['finished_at']:
         raise Exception("Game is already finished")
@@ -271,7 +294,7 @@ def remove_note(params: PlayGameParams):
     if params['x'] < 0 or params['x'] > 8 or params['y'] < 0 or params['y'] > 8:
         raise Exception("Invalid square")
 
-    square = game['board'][params['y']][params['x']]
+    square = game['board'][params['x']][params['y']]
 
     if game['finished_at']:
         raise Exception("Game is already finished")
@@ -308,7 +331,7 @@ def set_number(params: PlayGameParams):
     if params['x'] < 0 or params['x'] > 8 or params['y'] < 0 or params['y'] > 8:
         raise Exception("Invalid square")
 
-    square = game['board'][params['y']][params['x']]
+    square = game['board'][params['x']][params['y']]
 
     if game['finished_at']:
         raise Exception("Game is already finished")
@@ -348,10 +371,7 @@ def remove_number(params: PlayGameParams):
     if not game:
         raise Exception("Game not found")
 
-    if params['x'] < 0 or params['x'] > 8 or params['y'] < 0 or params['y'] > 8:
-        raise Exception("Invalid square")
-
-    square = game['board'][params['y']][params['x']]
+    square = game['board'][params['x']][params['y']]
 
     if game['finished_at']:
         raise Exception("Game is already finished")

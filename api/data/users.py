@@ -99,13 +99,14 @@ def list(limit: int = 25, next_token: Optional[str] = None):
 
 def update(user: User):
     table = dynamodb.Table(config.users_dynamodb_table)
+    new_user: dict = {
+        **user,
+        "created_at": serialize_datetime(user['created_at']),
+        "updated_at": get_now_str(),
+    }
     try:
-        response = table.put_item(Item={
-            **user.__dict__,
-            "created_at": serialize_datetime(user['created_at']),
-            "updated_at": get_now_str(),
-        })
-        return response
+        table.put_item(Item=new_user)
+        return deserialize(new_user)
     except ClientError as e:
         logger.error(
             f"Failed to add user. Error: {e.response.get('Error', {}).get('Message', '')}")

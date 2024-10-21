@@ -2,12 +2,13 @@
 ####        Sudoku Games         ####
 #####################################
 
-type SudokuGameSquare {
+type SudokuGameCell {
   x: Int!
   y: Int!
   number: Int
   isFixed: Boolean!
   notes: [Int!]!
+  isCorrect: Boolean
 }
 
 enum SudokuSudokuGameMoveType {
@@ -28,7 +29,7 @@ type SudokuGameMove {
 type SudokuGame {
   id: ID!
   userId: String!
-  board: [[SudokuGameSquare!]!]!
+  board: [[SudokuGameCell!]!]!
   moves: [SudokuGameMove!]!
   finishedAt: DateTime
   createdAt: DateTime!

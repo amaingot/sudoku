@@ -4,6 +4,7 @@ fragment User on User {
   lastName
   email
   phoneNumber
+  currentSudokuGameId
   createdAt
   updatedAt
 }
@@ -11,6 +12,9 @@ fragment User on User {
 query GetMe {
   me {
     ...User
+    currentSudokuGame {
+      ...SudokuGame
+    }
   }
 }
 

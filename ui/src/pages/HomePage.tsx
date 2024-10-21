@@ -5,6 +5,7 @@ import classes from "./HomePage.module.css";
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+
   return (
     <div className={classes.wrapper}>
       <Container size={800} className={classes.inner}>

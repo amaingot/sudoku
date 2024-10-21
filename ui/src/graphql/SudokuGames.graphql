@@ -1,12 +1,17 @@
+fragment SudokuGameCell on SudokuGameCell {
+  x
+  y
+  number
+  isFixed
+  notes
+  isCorrect
+}
+
 fragment SudokuGame on SudokuGame {
   id
   userId
   board {
-    x
-    y
-    number
-    isFixed
-    notes
+    ...SudokuGameCell
   }
   moves {
     x

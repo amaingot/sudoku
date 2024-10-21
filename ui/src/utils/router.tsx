@@ -14,6 +14,8 @@ import SignUpPage from "../pages/SignUpPage";
 import SignUpSuccessPage from "../pages/SignUpSuccessPage";
 import SignUpConfirmPage from "../pages/SignUpConfirmPage";
 import DashboardPage from "../pages/DashboardPage";
+import GamesPage from "../pages/GamesPage";
+import SettingsPage from "../pages/SettingsPage";
 
 export const appRouter = createBrowserRouter([
   {
@@ -36,8 +38,8 @@ export const appRouter = createBrowserRouter([
     element: <AuthLayout />,
     children: [
       { path: "/signup", element: <SignUpPage /> },
-      { path: "/signup/success", element: <SignUpSuccessPage /> },
       { path: "/signup/confirm", element: <SignUpConfirmPage /> },
+      { path: "/signup/success", element: <SignUpSuccessPage /> },
     ],
   },
   {
@@ -45,6 +47,8 @@ export const appRouter = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { path: "/app", element: <DashboardPage /> },
+      { path: "/app/games", element: <GamesPage /> },
+      { path: "/app/settings", element: <SettingsPage /> },
       { path: "/app/*", element: <NotFoundPage /> },
     ],
   },

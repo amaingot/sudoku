@@ -44,6 +44,11 @@ mutation.set_field("createSudokuGame", sudoku_games.create_game)
 mutation.set_field("deleteSudokuGame", sudoku_games.delete_game)
 mutation.set_field("makeSudokuGameMove", sudoku_games.make_game_move)
 
+# Sudoku Game Cell
+sudoku_game_cell = ObjectType("SudokuGameCell")
+sudoku_game_cell.set_field("isCorrect", sudoku_games.get_cell_is_correct)
+sudoku_game_cell.set_field("notes", sudoku_games.get_cell_notes)
+
 # Sudoku Game Move
 sudoku_game_move = ObjectType("SudokuGameMove")
 sudoku_game_move.set_field("type", sudoku_games.get_game_move_type)
@@ -56,6 +61,7 @@ schema = make_executable_schema(
         mutation,
         user,
         sudoku_game,
+        sudoku_game_cell,
         sudoku_game_move,
     ],
     snake_case_fallback_resolvers,

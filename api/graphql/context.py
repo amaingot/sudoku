@@ -20,6 +20,7 @@ class Context:
         self.decoded_token = None
         self.user_info = None
         self.user_id = None
+        self.user = None
 
         try:
             if self.token is not None and self.token.startswith("Bearer "):

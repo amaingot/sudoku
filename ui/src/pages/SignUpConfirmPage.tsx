@@ -1,12 +1,11 @@
 import React from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Title, Text, Button, PinInput, Center } from "@mantine/core";
 import { useConfirmSignUpMutation } from "../graphql";
-import { useAuth } from "../contexts/AuthContext";
 
 const SignUpConfirmPage: React.FC = () => {
+  const navigate = useNavigate();
   const [search] = useSearchParams();
-  const auth = useAuth();
   const userId = search.get("userId") || "";
   const [code, setCode] = React.useState(search.get("code") || "");
   const [error, setError] = React.useState<string | undefined>(undefined);
@@ -17,7 +16,7 @@ const SignUpConfirmPage: React.FC = () => {
     setError(undefined);
     try {
       await confirmSignUp({ variables: { input: { userId, code } } });
-      auth.login("/app");
+      navigate("/signup/success");
     } catch (error) {
       if (typeof error === "string") {
         setError(error);
