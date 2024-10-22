@@ -4,7 +4,6 @@ import {
   useMakeSudokuGameMoveMutation,
 } from "../graphql";
 import { Center, Text, Box, SimpleGrid } from "@mantine/core";
-import classes from "./SudokuCell.module.css";
 
 interface Props {
   gameId: string;
@@ -67,7 +66,7 @@ const SudokuCell: React.FC<Props> = ({
         onClick={() => removeNumber()}
       >
         <Center w="100%" h="100%">
-          <Text size="xl" c={isFixed ? "black" : isCorrect ? "blue" : "red"}>
+          <Text size={`${size*.6}px`} c={isFixed ? "black" : isCorrect ? "blue" : "red"}>
             {number || ""}
           </Text>
         </Center>
@@ -137,19 +136,14 @@ const SudokuCell: React.FC<Props> = ({
           >
             <Text
               size="sm"
-              className={
-                touchMode
-                  ? notesMode
-                    ? classes.sudokuSubCellNotes
-                    : classes.sudokuSubCell
-                  : undefined
-              }
               c={
                 notes.includes(n)
                   ? selectedNumber === n
                     ? "white"
                     : "blue"
-                  : touchMode ? "transparent" : "gray.4"
+                  : touchMode
+                  ? "transparent"
+                  : "gray.4"
               }
               fw={notes.includes(n) ? "bold" : undefined}
             >
