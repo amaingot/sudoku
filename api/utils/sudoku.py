@@ -2,6 +2,8 @@ import random
 from typing import Optional,  List, TypedDict
 import uuid
 
+from api.utils.logging import logger
+
 
 class GameSquare(TypedDict):
     x: int
@@ -62,12 +64,41 @@ def solve_board(board: List[List[Optional[int]]]) -> bool:
     return True
 
 
-def verify_not_multiple_solutions(board: List[List[Optional[int]]]) -> bool:
-    """Verify that the Sudoku board has only one solution."""
-    board_copy = []
+def count_solutions(board: List[List[Optional[int]]], count: int = 0) -> int:
+    """Modified backtracking to count the number of solutions for a Sudoku board."""
+    # Base case: If count exceeds 1, we already know there's more than one solution
+    if count > 1:
+        return count
+
     for row in range(9):
-        board_copy.append([board[row][col] for col in range(9)])
-    return solve_board(board_copy)
+        for col in range(9):
+            if board[row][col] is None:  # Find an empty spot
+                for num in range(1, 10):
+                    if is_valid(board, row, col, num):  # Check if placing this number is valid
+                        board[row][col] = num  # Place the number
+                        # Recur to try solving further
+                        count = count_solutions(board, count)
+                        # Backtrack by removing the number
+                        board[row][col] = None
+
+                        # If we already found more than 1 solution, we can stop early
+                        if count > 1:
+                            return count
+                return count  # If no valid number found, return the count so far
+    # If no more empty spots and the board is valid, we found a solution
+    return count + 1
+
+
+def has_unique_solution(board: List[List[Optional[int]]]) -> bool:
+    """Verifies if the Sudoku board has exactly one solution."""
+    # Make a copy of the board
+    new_board = [[board[row][col] for col in range(9)] for row in range(9)]
+
+    # Start counting solutions from 0
+    solutions_count = count_solutions(new_board, 0)
+
+    # If exactly one solution is found, the board is unique
+    return solutions_count == 1
 
 
 def remove_numbers(board: List[List[Optional[int]]], difficulty: int) -> List[List[Optional[int]]]:
@@ -81,13 +112,21 @@ def remove_numbers(board: List[List[Optional[int]]], difficulty: int) -> List[Li
     for row in range(9):
         new_board.append([board[row][col] for col in range(9)])
 
+    all_cells = [(row, col) for row in range(9) for col in range(9)]
+    random.shuffle(all_cells)
+    all_cells_i = 0
+
     while removed < cells_to_remove:
-        row, col = random.randint(0, 8), random.randint(0, 8)
+        if (all_cells_i >= len(all_cells)):
+            logger.error(
+                f"While creating {difficulty} game, Not enough cells to remove")
+            return new_board
+        row, col = all_cells[all_cells_i]
+        all_cells_i += 1
         if new_board[row][col] is not None:
             old_value = new_board[row][col]
             new_board[row][col] = None
-
-            if not verify_not_multiple_solutions(new_board):
+            if not has_unique_solution(new_board):
                 new_board[row][col] = old_value
             else:
                 removed += 1
