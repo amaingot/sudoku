@@ -1,0 +1,96 @@
+name: UI Deploy
+
+on:
+  push:
+    branches:
+      - "main"
+    tags:
+      - "v*.*.*"
+    paths:
+      - "ui/**"
+      - ".github/workflows/ui-deploy.yml"
+
+concurrency:
+  group: ui-deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  determine_environment:
+    name: 🏗️ Determine Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.determine_environment.outputs.result }}
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v4
+
+      - name: 🧪 Determine Environment
+        uses: actions/github-script@v7
+        id: determine_environment
+        with:
+          script: |
+            if ('${{ github.ref_type }}' === 'tag') {
+              return 'prod';
+            } else {
+              return 'beta';
+            }
+          result-encoding: string
+
+  deployment:
+    name: 🚀 Deploy UI
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.determine_environment.outputs.environment }}
+    needs:
+      - determine_environment
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Yarn and Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache-dependency-path: ui/yarn.lock
+
+      - name: 📚 Install dependencies
+        working-directory: ui
+        run: |
+          yarn install --immutable
+
+      - name: 📚 Generate GraphQL hooks/types
+        working-directory: ui
+        run: |
+          yarn gql
+
+      - name: 🛠 Build UI Assets
+        working-directory: ui
+        env:
+          VITE_ENV: ${{ needs.determine_environment.outputs.environment }}
+          VITE_SHA: ${{ github.sha }}
+          VITE_API_DOMAIN: ${{ vars.API_DOMAIN }}
+          VITE_WS_DOMAIN: ${{ vars.WS_DOMAIN }}
+          VITE_AUTH_DOMAIN: ${{ vars.AUTH_DOMAIN }}
+          VITE_AUTH_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
+        run: |
+          yarn --cwd=ui build
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🚀 Upload UI assets to S3
+        run: |
+          aws s3 sync ui/dist s3://${{ vars.UI_S3_BUCKET }} --delete
+
+      - name: 🧹 Invalidate Dev Cloudfront Caches
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths '/*'

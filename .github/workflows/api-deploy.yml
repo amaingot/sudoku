@@ -1,0 +1,107 @@
+name: API Deploy
+
+on:
+  push:
+    branches:
+      - "main"
+    tags:
+      - "v*.*.*"
+    paths:
+      - "api/**"
+      - ".github/workflows/api-deploy.yml"
+      - "scripts/ci_deploy_lambda.sh"
+      - "requirements.txt"
+
+concurrency:
+  group: api-deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  determine_environment:
+    name: 🏗️ Determine Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.determine_environment.outputs.result }}
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v4
+
+      - name: 🧪 Determine Environment
+        uses: actions/github-script@v7
+        id: determine_environment
+        with:
+          script: |
+            if ('${{ github.ref_type }}' === 'tag') {
+              return 'prod';
+            } else {
+              return 'beta';
+            }
+          result-encoding: string
+
+  deployment:
+    name: 🚀 Deploy API
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.determine_environment.outputs.environment }}
+    needs:
+      - determine_environment
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v4
+
+      - name: 🏗 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 🏗 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -t python
+
+      - name: 📦 Package Layer Zip
+        run: |
+          zip -r layer.zip python
+
+      - name: 📦 Package Lambda Zip
+        run: |
+          zip -r lambda.zip api
+
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🚀 Deploy Lambda Layer
+        id: deploy-layer
+        run: |
+          LAYER_ARN=$(aws lambda publish-layer-version \
+            --layer-name ${{ vars.LAMBDA_LAYER_NAME }} \
+            --description "Sudoku Lambda Layer (Github SHA:${{ github.sha }}" \
+            --zip-file fileb://layer.zip \
+            --compatible-runtimes python3.12 \
+            --compatible-architectures x86_64 \
+            --region ${{ secrets.AWS_REGION }} \
+            --output json \
+            --no-cli-pager \
+            --query 'LayerVersionArn')
+
+          LAYER_ARN=$(echo $LAYER_ARN | tr -d '"')
+
+          chmod +x scripts/ci_deploy_lambda.sh
+          echo "LAYER_ARN=$LAYER_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: 🚀 Deploy Lambdas
+        env:
+          LAYER_VERSION_ARN: ${{ steps.deploy-layer.outputs.LAYER_ARN }}
+        run: |
+          ./scripts/ci_deploy_lambda.sh ${{ vars.API_LAMBDA_NAME }} &
+          ./scripts/ci_deploy_lambda.sh ${{ vars.WS_LAMBDA_NAME }} &
+          ./scripts/ci_deploy_lambda.sh ${{ vars.AUTH_LAMBDA_NAME }} &
+          wait
