@@ -1,0 +1,58 @@
+fragment SudokuGameCell on SudokuGameCell {
+  x
+  y
+  number
+  isFixed
+  notes
+  isCorrect
+}
+
+fragment SudokuGame on SudokuGame {
+  id
+  userId
+  board {
+    ...SudokuGameCell
+  }
+  moves {
+    x
+    y
+    number
+    type
+    timestamp
+  }
+  difficulty
+  finishedAt
+  createdAt
+  updatedAt
+}
+
+query GetSudokuGame($id: ID!) {
+  getSudokuGame(id: $id) {
+    ...SudokuGame
+  }
+}
+
+query ListSudokuGames($input: ListSudokuGamesInput) {
+  listSudokuGames(input: $input) {
+    items {
+      ...SudokuGame
+    }
+    nextToken
+  }
+}
+
+mutation CreateSudokuGame($input: CreateSudokuGameInput!) {
+  createSudokuGame(input: $input) {
+    ...SudokuGame
+  }
+}
+
+mutation MakeSudokuGameMove($input: MakeSudokuGameMoveInput!) {
+  makeSudokuGameMove(input: $input) {
+    ...SudokuGame
+  }
+}
+
+mutation DeleteSudokuGame($id: ID!) {
+  deleteSudokuGame(id: $id)
+}

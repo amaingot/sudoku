@@ -1,0 +1,9 @@
+mutation SignUp($input: SignUpInput!) {
+  signUp(input: $input) {
+    ...User
+  }
+}
+
+mutation ConfirmSignUp($input: ConfirmSignUpInput!) {
+  confirmSignUp(input: $input)
+}

@@ -30,8 +30,12 @@ output "users_dynamodb_table" {
   value = aws_dynamodb_table.users.name
 }
 
-output "auth_client_id" {
+output "web_auth_client_id" {
   value = aws_cognito_user_pool_client.ui_client.id
+}
+
+output "mobile_auth_client_id" {
+  value = aws_cognito_user_pool_client.mobile_client.id
 }
 
 output "auth_user_pool_endpoint" {

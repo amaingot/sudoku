@@ -5,9 +5,9 @@ resource "aws_cognito_user_pool" "app" {
   mfa_configuration        = "OPTIONAL"
   tags                     = local.tags
 
-  lambda_config {
-    # pre_authentication = aws_lambda_function.auth.arn
-  }
+  # lambda_config {
+  # pre_authentication = aws_lambda_function.auth.arn
+  # }
 
   admin_create_user_config {
     allow_admin_create_user_only = true
@@ -125,6 +125,28 @@ resource "aws_cognito_user_pool_client" "ui_client" {
   logout_urls = [
     "https://${local.ui_domain}",
     "http://localhost:5173",
+  ]
+
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_scopes                 = ["email", "openid", "phone", "profile", "aws.cognito.signin.user.admin"]
+  supported_identity_providers         = ["COGNITO"]
+  allowed_oauth_flows_user_pool_client = true
+
+  read_attributes  = ["email", "email_verified", "given_name", "family_name", "phone_number", "phone_number_verified", "address", "birthdate", "gender", "locale", "middle_name", "name", "nickname", "picture", "preferred_username", "profile", "updated_at", "website", "zoneinfo"]
+  write_attributes = ["email", "given_name", "family_name", "phone_number", "address", "birthdate", "gender", "locale", "middle_name", "name", "nickname", "picture", "preferred_username", "profile", "updated_at", "website", "zoneinfo"]
+}
+
+resource "aws_cognito_user_pool_client" "mobile_client" {
+  name            = "mobile-client"
+  user_pool_id    = aws_cognito_user_pool.app.id
+  generate_secret = false
+  callback_urls = [
+    "exp://localhost:8081"
+  ]
+  default_redirect_uri = "exp://localhost:8081"
+
+  logout_urls = [
+    "exp://localhost:8081",
   ]
 
   allowed_oauth_flows                  = ["code"]
