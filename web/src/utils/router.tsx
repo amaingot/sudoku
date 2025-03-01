@@ -16,6 +16,7 @@ import SignUpConfirmPage from "../pages/SignUpConfirmPage";
 import DashboardPage from "../pages/DashboardPage";
 import GamesPage from "../pages/GamesPage";
 import SettingsPage from "../pages/SettingsPage";
+import FeaturesPage from "../pages/FeaturesPage";
 
 export const appRouter = createBrowserRouter([
   {
@@ -27,6 +28,7 @@ export const appRouter = createBrowserRouter([
     element: <PublicLayout />,
     children: [
       { path: "", element: <HomePage /> },
+      { path: "/features", element: <FeaturesPage /> },
       { path: "/team", element: <TeamPage /> },
       { path: "/contact", element: <ContactPage /> },
       { path: "/error", element: <ErrorPage /> },

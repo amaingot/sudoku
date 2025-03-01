@@ -1,5 +1,5 @@
 import React from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import {
   AppShell,
   Container,
@@ -17,8 +17,8 @@ import { useDisclosure } from "@mantine/hooks";
 import { useAuth } from "../contexts/AuthContext";
 
 const navLinks = [
+  { link: "/", label: "Home" },
   { link: "/features", label: "Features" },
-  { link: "/pricing", label: "Pricing" },
   { link: "/team", label: "Team" },
   { link: "/contact", label: "Contact" },
 ];
@@ -32,9 +32,8 @@ const PublicLayout: React.FC = () => {
   const topLinks = navLinks.map((link) => (
     <Button
       key={link.label}
-      component="a"
-      href={link.link}
-      onClick={() => navigate(link.link)}
+      component={Link}
+      to={link.link}
       variant={link.link === location.pathname ? "filled" : "transparent"}
       color="blue"
       size="sm"
@@ -49,12 +48,11 @@ const PublicLayout: React.FC = () => {
       ta="center"
       my="md"
       active={link.link === location.pathname}
-      onClick={(e) => {
-        e.preventDefault();
+      component={Link}
+      onClick={() => {
         close();
-        navigate(link.link);
       }}
-      href={link.link}
+      to={link.link}
       label={link.label}
       hiddenFrom="sm"
     />

@@ -1,5 +1,5 @@
 # Autogrenerated GQL UI files
-ui/src/graphql/index.ts
+web/src/graphql/index.ts
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

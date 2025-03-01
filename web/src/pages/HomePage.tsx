@@ -10,7 +10,7 @@ const HomePage: React.FC = () => {
     <div className={classes.wrapper}>
       <Container size={800} className={classes.inner}>
         <h1 className={classes.title}>
-          Serve up
+          Your
           <Text
             component="span"
             variant="gradient"
@@ -18,25 +18,23 @@ const HomePage: React.FC = () => {
             inherit
           >
             {" "}
-            success
+            Ultimate
           </Text>
           ,<br />
-          One{" "}
+          Free{" "}
           <Text
             component="span"
             variant="gradient"
             gradient={{ from: "blue", to: "cyan" }}
             inherit
           >
-            string
+            Sudoku
           </Text>{" "}
-          at a time
+          Experience Awaits
         </h1>
 
         <Text className={classes.description} color="dimmed">
-          Your all-in-one cloud solution for effortlessly managing string jobs
-          and employee schedules. Simplify operations and boost efficiency in
-          your tennis shop today!
+          Master the Puzzle, Anytime, Anywhere!
         </Text>
 
         <Group className={classes.controls}>

@@ -11,7 +11,7 @@ import classes from "./TeamPage.module.css";
 
 const data = [
   {
-    title: "Alex Maingot",
+    title: "Alex",
     description: "Cool guy who does engineering stuff.",
   },
 ];
@@ -39,24 +39,24 @@ const TeamPage: React.FC = () => {
 
   return (
     <Container size={700} className={classes.wrapper}>
-      <Text className={classes.supTitle}>Tennis Shop Guru Team</Text>
+      <Text className={classes.supTitle}>Sudoku Team</Text>
 
       <Title className={classes.title} order={2}>
         Meet Our Team: <span className={classes.highlight}>Innovators</span> at
-        the Forefront of Tennis Shop Technology
+        the Forefront of Sudoku Technology
       </Title>
 
       <Container size={660} p={0} my="xl">
         <Text c="dimmed" className={classes.description}>
-          Meet the dedicated team behind Tennis Shop Guru, a group of passionate
-          professionals committed to revolutionizing the way tennis shop owners
-          manage their businesses. With a diverse range of expertise spanning
-          software development, customer service, and tennis industry knowledge,
-          our team is driven by a shared vision of empowering tennis
-          entrepreneurs with innovative solutions. Get to know the faces behind
-          our success and discover how our collective experience drives every
-          aspect of Tennis Shop Guru's mission to elevate the tennis retail
-          experience.
+          Our passionate team is dedicated to creating the ultimate Sudoku
+          experience for players of all levels. With backgrounds in software
+          development, game design, and a shared love for puzzles, we bring
+          together creativity and technical expertise to build an app that’s
+          both engaging and intuitive. Driven by a commitment to quality and
+          user experience, we focus on adding thoughtful features and design
+          elements that make each game feel rewarding. We believe that Sudoku
+          should be fun, accessible, and challenging, and we're thrilled to
+          share this app with puzzle lovers everywhere.
         </Text>
       </Container>
 

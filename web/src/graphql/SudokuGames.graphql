@@ -20,6 +20,7 @@ fragment SudokuGame on SudokuGame {
     type
     timestamp
   }
+  difficulty
   finishedAt
   createdAt
   updatedAt
