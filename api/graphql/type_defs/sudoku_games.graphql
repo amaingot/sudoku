@@ -31,6 +31,7 @@ type SudokuGame {
   userId: String!
   board: [[SudokuGameCell!]!]!
   moves: [SudokuGameMove!]!
+  difficulty: Int!
   finishedAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
