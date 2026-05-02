@@ -86,7 +86,7 @@ locals {
     UI_DOMAIN  = "${local.ui_domain}"
     WS_DOMAIN  = "${local.ws_domain}"
 
-    WS_APIGATEWAY_ENDPOINT = "https://${aws_apigatewayv2_api.ws.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}/"
+    WS_APIGATEWAY_ENDPOINT = "https://${aws_apigatewayv2_api.ws.id}.execute-api.${data.aws_region.current.region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}/"
 
     WS_CONNECTIONS_DYNAMODB_TABLE = "${aws_dynamodb_table.websocket_connections.name}"
     SUDOKU_GAMES_DYNAMODB_TABLE   = "${aws_dynamodb_table.sudoku_games.name}"

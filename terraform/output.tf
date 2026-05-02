@@ -15,7 +15,7 @@ output "auth_domain" {
 }
 
 output "ws_apigateway_endpoint" {
-  value = "https://${aws_apigatewayv2_api.ws.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}/"
+  value = "https://${aws_apigatewayv2_api.ws.id}.execute-api.${data.aws_region.current.region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}/"
 }
 
 output "ws_connections_dynamodb_table" {
