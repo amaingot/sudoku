@@ -11,6 +11,9 @@ jobs:
   preview:
     name: 🛠 Push Update
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
     steps:
       - name: 🏗 Setup repo
         uses: actions/checkout@v6
@@ -37,4 +40,5 @@ jobs:
       - name: 🚀 Create preview build
         uses: expo/expo-github-action/preview@v8
         with:
+          working-directory: mobile
           command: eas update --auto --branch ${{ github.event.pull_request.head.ref }}
