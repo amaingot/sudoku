@@ -1,9 +1,29 @@
+# Authorizes Cognito to use the no-reply SES identity as the From address on
+# verification / recovery emails. Without this, fresh user-pool creations fail
+# with InvalidEmailRoleAccessPolicyException.
+resource "aws_ses_identity_policy" "cognito_no_reply" {
+  identity = data.aws_ses_email_identity.no_reply.arn
+  name     = "${local.resource_prefix}-cognito-send"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowCognitoToSendEmail"
+      Effect    = "Allow"
+      Principal = { Service = "cognito-idp.amazonaws.com" }
+      Action    = ["ses:SendEmail", "ses:SendRawEmail"]
+      Resource  = data.aws_ses_email_identity.no_reply.arn
+    }]
+  })
+}
+
 resource "aws_cognito_user_pool" "app" {
   name                     = local.resource_prefix
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
   mfa_configuration        = "OPTIONAL"
   tags                     = local.tags
+
+  depends_on = [aws_ses_identity_policy.cognito_no_reply]
 
   # lambda_config {
   # pre_authentication = aws_lambda_function.auth.arn
