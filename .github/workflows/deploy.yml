@@ -1,0 +1,266 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - "main"
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        options:
+          - beta
+          - prod
+        default: beta
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  determine_environment:
+    name: 🏗️ Determine Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.determine_environment.outputs.result }}
+    steps:
+      - name: 🧪 Determine Environment
+        uses: actions/github-script@v9
+        id: determine_environment
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch') {
+              return context.payload.inputs.environment;
+            }
+            if (context.payload.ref && context.payload.ref.startsWith('refs/tags/')) {
+              return 'prod';
+            }
+            return 'beta';
+          result-encoding: string
+
+  detect_changes:
+    name: 🔍 Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      terraform: ${{ steps.filter.outputs.terraform }}
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v6
+
+      - name: 🔍 Path Filter
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            terraform:
+              - 'terraform/**'
+              - '.github/workflows/deploy.yml'
+            api:
+              - 'api/**'
+              - 'requirements.txt'
+              - 'scripts/ci_deploy_lambda.sh'
+              - '.github/workflows/deploy.yml'
+            web:
+              - 'web/**'
+              - '.github/workflows/deploy.yml'
+
+  terraform:
+    name: 🏗️ Terraform Apply
+    runs-on: ubuntu-latest
+    needs:
+      - determine_environment
+      - detect_changes
+    if: |
+      needs.detect_changes.outputs.terraform == 'true'
+      || github.ref_type == 'tag'
+      || github.event_name == 'workflow_dispatch'
+    environment:
+      name: ${{ needs.determine_environment.outputs.environment }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.TERRAFORM_GITHUB_TOKEN }}
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v6
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🏗 Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.15.0
+          terraform_wrapper: true
+
+      - name: 🏗 Terraform Init
+        working-directory: terraform
+        env:
+          TF_ENV: ${{ needs.determine_environment.outputs.environment }}
+        run: |
+          terraform init
+          terraform workspace select "$TF_ENV"
+
+      - name: 🪄 Terraform Apply
+        working-directory: terraform
+        env:
+          TF_ENV: ${{ needs.determine_environment.outputs.environment }}
+          TF_SHA: ${{ github.sha }}
+        run: |
+          terraform apply \
+            -var-file="vars/${TF_ENV}.tfvars" \
+            -var="sha=${TF_SHA}" \
+            -auto-approve
+
+  api_deploy:
+    name: 🚀 Deploy API
+    runs-on: ubuntu-latest
+    needs:
+      - determine_environment
+      - detect_changes
+      - terraform
+    if: |
+      always() && !failure() && !cancelled() &&
+      (needs.detect_changes.outputs.api == 'true'
+        || github.ref_type == 'tag'
+        || github.event_name == 'workflow_dispatch')
+    environment:
+      name: ${{ needs.determine_environment.outputs.environment }}
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v6
+
+      - name: 🏗 Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: 🏗 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -t python
+
+      - name: 📦 Package Layer Zip
+        run: |
+          zip -r layer.zip python
+
+      - name: 📦 Package Lambda Zip
+        run: |
+          zip -r lambda.zip api
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🚀 Deploy Lambda Layer
+        id: deploy-layer
+        env:
+          LAYER_NAME: ${{ vars.LAMBDA_LAYER_NAME }}
+          LAYER_DESCRIPTION: "Sudoku Lambda Layer (Github SHA:${{ github.sha }})"
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          LAYER_ARN=$(aws lambda publish-layer-version \
+            --layer-name "$LAYER_NAME" \
+            --description "$LAYER_DESCRIPTION" \
+            --zip-file fileb://layer.zip \
+            --compatible-runtimes python3.12 \
+            --compatible-architectures x86_64 \
+            --region "$AWS_REGION" \
+            --output json \
+            --no-cli-pager \
+            --query 'LayerVersionArn')
+
+          LAYER_ARN=$(echo "$LAYER_ARN" | tr -d '"')
+
+          chmod +x scripts/ci_deploy_lambda.sh
+          echo "LAYER_ARN=$LAYER_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: 🚀 Deploy Lambdas
+        env:
+          LAYER_VERSION_ARN: ${{ steps.deploy-layer.outputs.LAYER_ARN }}
+          API_LAMBDA_NAME: ${{ vars.API_LAMBDA_NAME }}
+          WS_LAMBDA_NAME: ${{ vars.WS_LAMBDA_NAME }}
+          AUTH_LAMBDA_NAME: ${{ vars.AUTH_LAMBDA_NAME }}
+        run: |
+          ./scripts/ci_deploy_lambda.sh "$API_LAMBDA_NAME" &
+          ./scripts/ci_deploy_lambda.sh "$WS_LAMBDA_NAME" &
+          ./scripts/ci_deploy_lambda.sh "$AUTH_LAMBDA_NAME" &
+          wait
+
+  web_deploy:
+    name: 🚀 Deploy Web
+    runs-on: ubuntu-latest
+    needs:
+      - determine_environment
+      - detect_changes
+      - terraform
+    if: |
+      always() && !failure() && !cancelled() &&
+      (needs.detect_changes.outputs.web == 'true'
+        || github.ref_type == 'tag'
+        || github.event_name == 'workflow_dispatch')
+    environment:
+      name: ${{ needs.determine_environment.outputs.environment }}
+    steps:
+      - name: 🏗 Check out the repo
+        uses: actions/checkout@v6
+
+      - name: 🏗 Setup Yarn and Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache-dependency-path: web/yarn.lock
+
+      - name: 📚 Install dependencies
+        working-directory: web
+        run: |
+          yarn install --immutable
+
+      - name: 📚 Generate GraphQL hooks/types
+        working-directory: web
+        run: |
+          yarn gql
+
+      - name: 🛠 Build Web Assets
+        working-directory: web
+        env:
+          VITE_ENV: ${{ needs.determine_environment.outputs.environment }}
+          VITE_SHA: ${{ github.sha }}
+          VITE_API_DOMAIN: ${{ vars.API_DOMAIN }}
+          VITE_WS_DOMAIN: ${{ vars.WS_DOMAIN }}
+          VITE_AUTH_DOMAIN: ${{ vars.AUTH_DOMAIN }}
+          VITE_AUTH_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
+        run: |
+          yarn --cwd=web build
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🚀 Upload Web assets to S3
+        env:
+          UI_S3_BUCKET: ${{ vars.UI_S3_BUCKET }}
+        run: |
+          aws s3 sync web/dist "s3://${UI_S3_BUCKET}" --delete
+
+      - name: 🧹 Invalidate Cloudfront Caches
+        env:
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths '/*'
