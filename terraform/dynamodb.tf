@@ -6,8 +6,12 @@ resource "aws_dynamodb_table" "websocket_connections" {
 
   global_secondary_index {
     name            = "user_id-index"
-    hash_key        = "user_id"
     projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "user_id"
+      key_type       = "HASH"
+    }
   }
 
   attribute {
@@ -29,8 +33,12 @@ resource "aws_dynamodb_table" "sudoku_games" {
 
   global_secondary_index {
     name            = "user_id-index"
-    hash_key        = "user_id"
     projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "user_id"
+      key_type       = "HASH"
+    }
   }
 
   attribute {

@@ -34,18 +34,32 @@ locals {
   github_owner      = "amaingot"
   github_repository = "sudoku"
 
-  tags = {
-    environment = var.environment
-    application = "sudoku"
+  default_tags = {
+    Project     = "sudoku"
+    Environment = "${var.environment}"
+    Repository  = "github.com/${local.github_owner}/${local.github_repository}"
   }
 }
 
 provider "aws" {
   region = local.aws_region
   default_tags {
-    tags = local.tags
+    tags = local.default_tags
   }
 }
+
+resource "aws_servicecatalogappregistry_application" "app" {
+  name        = "sudoku-${var.environment}"
+  description = "Sudoku (${var.environment})"
+}
+
+locals {
+  tags = merge(
+    local.default_tags,
+    aws_servicecatalogappregistry_application.app.application_tag
+  )
+}
+
 
 provider "archive" {}
 
