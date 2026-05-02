@@ -32,6 +32,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "dc8f7ee7-ff23-48a6-ac94-d0bf759da48a"
+      }
+    },
+    "owner": "amaingot"
   }
 }
