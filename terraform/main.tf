@@ -26,10 +26,14 @@ locals {
   domain_prefix   = "sudoku${var.environment == "prod" ? "" : "-${var.environment}"}"
   app_domain      = "${local.domain_prefix}.${var.base_domain}"
 
-  api_domain  = "api-${local.app_domain}"
-  ws_domain   = "ws-${local.app_domain}"
-  ui_domain   = local.app_domain
-  auth_domain = "signin-${local.app_domain}"
+  api_domain = "api-${local.app_domain}"
+  ws_domain  = "ws-${local.app_domain}"
+  ui_domain  = local.app_domain
+
+  # Cognito hosted UI uses the default AWS-issued domain. The prefix must be
+  # globally unique per region.
+  auth_domain_prefix = "maingot-sudoku-${var.environment}"
+  auth_domain        = "${aws_cognito_user_pool_domain.app.domain}.auth.${data.aws_region.current.region}.amazoncognito.com"
 
   github_owner      = "amaingot"
   github_repository = "sudoku"

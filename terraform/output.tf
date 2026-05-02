@@ -11,7 +11,7 @@ output "ws_domain" {
 }
 
 output "auth_domain" {
-  value = aws_cognito_user_pool_domain.app.domain
+  value = local.auth_domain
 }
 
 output "ws_apigateway_endpoint" {

@@ -95,22 +95,8 @@ resource "aws_cognito_user_group" "admin" {
 }
 
 resource "aws_cognito_user_pool_domain" "app" {
-  domain          = local.auth_domain
-  certificate_arn = data.aws_acm_certificate.app.arn
-  user_pool_id    = aws_cognito_user_pool.app.id
-}
-
-resource "aws_route53_record" "cognito_domain" {
-  name            = aws_cognito_user_pool_domain.app.domain
-  type            = "A"
-  zone_id         = data.aws_route53_zone.primary.zone_id
-  allow_overwrite = true
-
-  alias {
-    evaluate_target_health = false
-    name                   = aws_cognito_user_pool_domain.app.cloudfront_distribution
-    zone_id                = aws_cognito_user_pool_domain.app.cloudfront_distribution_zone_id
-  }
+  domain       = local.auth_domain_prefix
+  user_pool_id = aws_cognito_user_pool.app.id
 }
 
 resource "aws_cognito_user_pool_client" "ui_client" {

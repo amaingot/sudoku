@@ -94,7 +94,7 @@ locals {
   }
 
   lambda_env_with_auth = {
-    AUTH_DOMAIN             = "${aws_cognito_user_pool_domain.app.domain}"
+    AUTH_DOMAIN             = local.auth_domain
     AUTH_CLIENT_ID          = "${aws_cognito_user_pool_client.ui_client.id}"
     AUTH_USER_POOL_ENDPOINT = "${aws_cognito_user_pool.app.endpoint}"
     AUTH_USER_POOL_ID       = "${aws_cognito_user_pool.app.id}"
