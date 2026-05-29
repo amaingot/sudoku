@@ -27,7 +27,7 @@ permissions:
 jobs:
   determine_environment:
     name: 🏗️ Determine Environment
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, arm64]
     outputs:
       environment: ${{ steps.determine_environment.outputs.result }}
     steps:
@@ -47,7 +47,7 @@ jobs:
 
   detect_changes:
     name: 🔍 Detect Changes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, arm64]
     outputs:
       terraform: ${{ steps.filter.outputs.terraform }}
       api: ${{ steps.filter.outputs.api }}
@@ -75,7 +75,7 @@ jobs:
 
   terraform:
     name: 🏗️ Terraform Apply
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, arm64]
     needs:
       - determine_environment
       - detect_changes
@@ -124,7 +124,7 @@ jobs:
 
   api_deploy:
     name: 🚀 Deploy API
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     needs:
       - determine_environment
       - detect_changes
@@ -201,7 +201,7 @@ jobs:
 
   web_deploy:
     name: 🚀 Deploy Web
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, arm64]
     needs:
       - determine_environment
       - detect_changes
