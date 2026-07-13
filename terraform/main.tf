@@ -52,16 +52,23 @@ provider "aws" {
   }
 }
 
-resource "aws_servicecatalogappregistry_application" "app" {
+resource "aws_resourcegroups_group" "app" {
   name        = "sudoku-${var.environment}"
-  description = "Sudoku (${var.environment})"
+  description = "Sudoku - ${var.environment}"
+
+  resource_query {
+    query = jsonencode({
+      ResourceTypeFilters = ["AWS::AllSupported"]
+      TagFilters = [
+        { Key = "Project", Values = ["sudoku"] },
+        { Key = "Environment", Values = [var.environment] },
+      ]
+    })
+  }
 }
 
 locals {
-  tags = merge(
-    local.default_tags,
-    aws_servicecatalogappregistry_application.app.application_tag
-  )
+  tags = local.default_tags
 }
 
 
