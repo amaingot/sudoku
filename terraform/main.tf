@@ -54,7 +54,7 @@ provider "aws" {
 
 resource "aws_resourcegroups_group" "app" {
   name        = "sudoku-${var.environment}"
-  description = "Sudoku (${var.environment})"
+  description = "Sudoku - ${var.environment}"
 
   resource_query {
     query = jsonencode({
